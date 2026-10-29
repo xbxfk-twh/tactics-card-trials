@@ -1,0 +1,25 @@
+# Managed by Tactics
+[Unit]
+Description=Tactics room and star-chart server
+After=network.target
+
+[Service]
+Type=simple
+User=tactics
+Group=tactics
+WorkingDirectory=/opt/tactics/current
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8088
+Environment=TACTICS_DATA_FILE=/var/lib/tactics/players.json
+ExecStart=/usr/bin/node server/server.cjs
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tactics
+
+[Install]
+WantedBy=multi-user.target

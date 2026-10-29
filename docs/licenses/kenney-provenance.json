@@ -1,0 +1,17 @@
+{
+  "author": "Kenney",
+  "license": "CC0 1.0",
+  "source": "https://kenney.nl/assets/particle-pack",
+  "archiveSha256": "b631d4b07f7002549fdcf155f01141ad482f79f3440e4e301eed49ce5f1d8958",
+  "frames": [
+    "smoke_07.png",
+    "fire_02.png",
+    "trace_01.png",
+    "star_07.png",
+    "slash_02.png",
+    "smoke_10.png",
+    "light_02.png",
+    "fire_01.png"
+  ],
+  "runtimeBytes": 39750
+}

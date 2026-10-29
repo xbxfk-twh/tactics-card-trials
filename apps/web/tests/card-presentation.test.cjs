@@ -1,0 +1,12 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+const c={window:{}};vm.createContext(c);for(const file of ['data/definitions','ui/card-presentation'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../js/'+file+'.js'),'utf8'),c);
+const D=c.window.GAME_DATA,P=c.window.CardPresentation,card=D.cards.knight;
+const unit={hp:50,maxHp:100,attack:20,defense:5,mp:0,ap:1,shield:0,charge:0};
+let html=P.stats(card,{unit});assert.equal((html.match(/data-stat=/g)||[]).length,6);assert.ok(html.includes('50/100'));assert.ok(!html.includes('data-stat="shield"'));assert.ok(!html.includes('data-stat="charge"'));assert.ok(html.includes('data-stat="move"'),'zero movement/action remain meaningful stats');assert.ok(html.includes('🪖'),'armor uses a helmet, not a shield');
+unit.shield=12;html=P.stats(card,{unit});assert.ok(html.includes('data-stat="shield"'));assert.ok(!html.includes('data-stat="charge"'));
+unit.charge=2;html=P.stats(card,{unit});assert.equal((html.match(/data-stat=/g)||[]).length,8);
+unit.shield=unit.charge=0;html=P.stats(card,{unit});assert.equal((html.match(/data-stat=/g)||[]).length,6,'spent resources disappear immediately');
+unit.defense=0;html=P.stats(card,{unit});assert.equal((html.match(/data-stat=/g)||[]).length,5);assert.ok(!html.includes('data-stat="defense"')&&!html.includes('🛡'),'zero armor no longer looks like a starting shield');assert.ok(P.stats(card).includes('data-stat="shield"'),'actual starting shield is visible in card previews');assert.ok(!P.stats(D.cards.mage).includes('data-stat="shield"'),'unshielded card previews show no shield');
+const book=P.skills(['shield_wall'],{cardId:'knight',uid:3});assert.ok(book.includes('data-action="info"')&&book.includes('data-uid="3"'));
+console.log('Base stats remain visible; absent/zero shield and charge are hidden and positive values appear');

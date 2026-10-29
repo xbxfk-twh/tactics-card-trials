@@ -1,0 +1,42 @@
+{
+  "entry": "index.html",
+  "scripts": [
+    "js/data/definitions.js",
+    "js/core/engine.js",
+    "js/campaign/content.js",
+    "js/campaign/progress.js",
+    "js/campaign/solo.js",
+    "js/campaign/solo-story.js",
+    "js/core/ai.js",
+    "js/practice/mode.js",
+    "js/network/tap-online.js",
+    "js/network/ranks.js",
+    "js/network/online.js",
+    "js/ui/stacking.js",
+    "js/ui/effects.js",
+    "js/ui/unit-state.js",
+    "js/ui/skill-audio.js",
+    "js/ui/music.js",
+    "js/ui/solo-view.js",
+    "js/ui/rooms-view.js",
+    "js/ui/card-presentation.js",
+    "js/ui/app.js"
+  ],
+  "styles": [
+    "css/app.css",
+    "css/campaign.css",
+    "css/social.css",
+    "css/board-units.css",
+    "css/card-presentation.css"
+  ],
+  "serverFiles": [
+    "server/server.cjs",
+    "tools/launch.cjs",
+    "package.json",
+    "package-lock.json",
+    "server/rank-store.cjs",
+    "tools/probe-server.cjs",
+    "server/tactics.service.example",
+    "server/tactics-location.conf.example"
+  ]
+}

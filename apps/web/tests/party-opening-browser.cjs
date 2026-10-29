@@ -1,0 +1,29 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process');
+const root=path.resolve(__dirname,'..'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'tactics-party-chrome-')),port=19270;
+process.env.TACTICS_DATA_FILE=path.join(profile,'players.json');const {server}=require('../server/server.cjs');
+let child,socket,seq=0;const pending=new Map(),errors=[],pause=ms=>new Promise(r=>setTimeout(r,ms));
+function command(method,params={}){return new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params}));});}
+async function evaluate(expression){const result=await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(result.result.exceptionDetails)throw Error(JSON.stringify(result.result.exceptionDetails));return result.result.result.value;}
+async function until(expression){for(let n=0;n<100;n++){if(await evaluate(expression))return;await pause(100);}throw Error('Timed out: '+expression);}
+async function click(selector){const p=await evaluate(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);await command('Input.dispatchMouseEvent',{type:'mousePressed',...p,button:'left',clickCount:1});await command('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button:'left',clickCount:1});}
+async function shot(name){await evaluate('Promise.all([...document.images].map(i=>i.decode().catch(()=>{})))');const r=await command('Page.captureScreenshot',{format:'png'});const out=path.join(root,'../../artifacts/screenshots/mobile');fs.mkdirSync(out,{recursive:true});fs.writeFileSync(path.join(out,name+'.png'),Buffer.from(r.result.data,'base64'));}
+(async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/`;
+ child=spawn(process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--disable-gpu','--no-first-run',`--user-data-dir=${profile}`,`--remote-debugging-port=${port}`,base],{stdio:'ignore',windowsHide:true});
+ let target;for(let n=0;n<80;n++){try{target=(await(await fetch(`http://127.0.0.1:${port}/json`)).json()).find(t=>t.url===base);if(target)break;}catch{}await pause(100);}assert.ok(target);
+ socket=new WebSocket(target.webSocketDebuggerUrl);socket.onmessage=event=>{const m=JSON.parse(event.data);if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m);}if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.exception?.description||m.params.exceptionDetails.text);};await new Promise(r=>socket.addEventListener('open',r,{once:true}));await command('Runtime.enable');await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+
+ await until('!!window.__TACTICS_TEST__');await click('[data-action=campaign]');await click('[data-action=party-campaign]');
+ for(const level of [1,2,3,4,5]){
+  await evaluate(`(()=>{const t=__TACTICS_TEST__;Object.assign(t.progress,{level:${level},cleared:Array.from({length:${level}-1},(_,i)=>i+1),owned:['treent_ancient','ranger','knight','mage','angel'],pendingReward:false});t.render();document.querySelector('[data-action=stage-select][data-id="${level}"]').click();})()`);
+  const preview=await evaluate(`(()=>{const n=CampaignProgress.partySize(${level});return {party:document.querySelectorAll('.camp-party img').length,foes:document.querySelectorAll('.camp-enemy-grid article').length,text:document.querySelector('.camp-enemy-grid').textContent,expected:CampaignProgress.encounter(${level}).map(e=>[e.hp,e.attack])};})()`);
+  assert.equal(preview.party,[1,2,2,3,4][level-1]);assert.equal(preview.foes,[1,2,2,3,4][level-1]);for(const [hp,attack] of preview.expected)assert.ok(preview.text.includes('生命 '+hp+' · 攻击 '+attack));
+  for(const [width,height] of [[320,568],[390,844],[1280,720]]){await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<701});const fit=await evaluate('({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight,button:document.querySelector("[data-action=stage-start]").getBoundingClientRect().bottom})');assert.ok(fit.width<=width&&fit.height<=height+1&&fit.button<=height,JSON.stringify({level,width,height,fit}));}
+  await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});if(level===3||level===4)await shot('63-party-stage-'+level);
+  await click('[data-action=stage-start]');const actual=await evaluate('__TACTICS_TEST__.game.units.filter(u=>u.team==="B").map(u=>[u.hp,u.attack])');assert.deepEqual(actual,preview.expected,'preview uses actual encounter values');
+  await evaluate('(()=>{const t=__TACTICS_TEST__,g=t.game;[...g.remaining("A")].forEach((c,i)=>g.deploy(c.id,{x:i,y:0}));t.render();})()');assert.equal(await evaluate('__TACTICS_TEST__.game.phase'),'battle');assert.equal(await evaluate('__TACTICS_TEST__.game.units.filter(u=>u.team==="A").length'),preview.party);
+  await evaluate('document.querySelector("[data-action=match-menu]").click();document.querySelector("[data-action=match-exit]").click();document.querySelector("[data-action=match-exit-confirm]").click()');
+ }
+ assert.deepEqual(errors,[]);console.log('Five opening party sizes, preview/real stats, deployment and phone/desktop camp bounds passed');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{socket?.close();child?.kill();server.close();await pause(500);assert.ok(path.resolve(profile).startsWith(path.resolve(os.tmpdir())+path.sep+'tactics-party-chrome-'));try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch(e){if(!['EPERM','EBUSY'].includes(e.code))throw e;}});
