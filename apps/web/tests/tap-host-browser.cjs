@@ -1,0 +1,34 @@
+'use strict';
+// Exercise the actual H5 package with callback-based host mocks. No public rooms or real login.
+const assert=require('node:assert/strict'),fs=require('node:fs'),http=require('node:http'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process');
+const root=path.resolve(__dirname,'../../..'),build=path.join(root,'dist/taptap-h5');
+assert.ok(fs.existsSync(path.join(build,'index.html')),'Run npm run build:taptap first');
+const profile=fs.mkdtempSync(path.join(os.tmpdir(),'tactics-tap-host-')),port=19271;
+const server=http.createServer((req,res)=>{let relative;try{relative=decodeURIComponent(new URL(req.url,'http://localhost').pathname);}catch{res.writeHead(400).end();return;}const target=path.resolve(build,'.'+(relative==='/'?'/index.html':relative));if(!target.startsWith(build+path.sep)){res.writeHead(403).end();return;}fs.readFile(target,(error,body)=>{if(error){res.writeHead(404).end();return;}res.setHeader('Content-Type',({'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.webp':'image/webp','.png':'image/png','.mp3':'audio/mpeg'})[path.extname(target)]||'application/octet-stream');res.end(body);});});
+let child,socket,sequence=0;const pending=new Map(),errors=[],pause=ms=>new Promise(r=>setTimeout(r,ms));
+function command(method,params={}){return new Promise((resolve,reject)=>{const id=++sequence;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params}));});}
+async function evaluate(expression){const reply=await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});if(reply.result.exceptionDetails)throw Error(JSON.stringify(reply.result.exceptionDetails));return reply.result.result.value;}
+async function until(expression){for(let n=0;n<100;n++){if(await evaluate(expression))return;await pause(100);}throw Error('Timed out: '+expression);}
+async function capture(name){const reply=await command('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});const target=path.join(root,'artifacts/screenshots/taptap');fs.mkdirSync(target,{recursive:true});fs.writeFileSync(path.join(target,name+'.png'),Buffer.from(reply.result.data,'base64'));}
+(async()=>{
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}/`;
+ child=spawn(process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',['--headless=new','--disable-gpu','--no-first-run',`--user-data-dir=${profile}`,`--remote-debugging-port=${port}`,base],{stdio:'ignore',windowsHide:true});
+ child.on('error',error=>{errors.push(error.message);});
+ let target;for(let n=0;n<100;n++){try{target=(await(await fetch(`http://127.0.0.1:${port}/json`)).json()).find(page=>page.url===base);if(target)break;}catch{}await pause(100);}assert.ok(target,'Chrome did not start');
+ socket=new WebSocket(target.webSocketDebuggerUrl);socket.onmessage=event=>{const message=JSON.parse(event.data);if(message.id&&pending.has(message.id)){const p=pending.get(message.id);pending.delete(message.id);message.error?p.reject(message.error):p.resolve(message);}if(message.method==='Runtime.exceptionThrown')errors.push(message.params.exceptionDetails.exception?.description||message.params.exceptionDetails.text);};await new Promise(r=>socket.addEventListener('open',r,{once:true}));await command('Runtime.enable');
+ await until("!!document.querySelector('[data-tap-enter]')");
+ for(const [width,height] of [[320,568],[390,844],[1280,720]]){await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<701});const fit=await evaluate('({width:document.documentElement.scrollWidth,height:document.documentElement.scrollHeight})');assert.ok(fit.width<=width&&fit.height<=height+1,JSON.stringify({width,height,fit}));}
+ await command('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});await capture('01-host-entry');
+ await evaluate("document.querySelector('[data-tap-enter]').click()");assert.ok(await evaluate("document.querySelector('[role=status]').textContent.includes('当前页面尚未提供')"));assert.equal(await evaluate('!!window.__TACTICS_TEST__'),false);
+ await evaluate("window.__tapCallbacks=[];window.tap={login:options=>__tapCallbacks.push(options),getOnlineBattleManager:()=>{throw Error('Tap rooms must not be used by the H5 profile');}}");
+ await evaluate("document.querySelector('[data-tap-enter]').click();document.querySelector('[data-tap-enter]').click()");assert.equal(await evaluate('__tapCallbacks.length'),1);assert.equal(await evaluate("document.querySelector('[data-tap-enter]').disabled"),true);
+ await evaluate('__tapCallbacks[0].fail({});__tapCallbacks[0].success({code:"stale-code"})');assert.equal(await evaluate('!!window.__TACTICS_TEST__'),false);
+ await evaluate("document.querySelector('[data-tap-enter]').click();__tapCallbacks[1].success({})");assert.ok(await evaluate("document.querySelector('[role=status]').textContent.includes('未返回有效')"));
+ await evaluate("document.querySelector('[data-tap-enter]').click();__tapCallbacks[0].success({code:'stale-again'});__tapCallbacks[2].success({code:'temporary-host-code'});__tapCallbacks[2].success({code:'duplicate'})");
+ await until("!!window.__TACTICS_TEST__&&!!document.querySelector('[data-action=campaign]')");assert.equal(await evaluate("document.querySelectorAll('script[src=\"js/ui/app.js\"]').length"),1);
+ assert.equal(await evaluate('__TACTICS_TEST__.online instanceof WebSocketOnlineClient'),true);assert.equal(await evaluate('__TACTICS_TEST__.online.endpoint()'),'wss://guyuyizhang.top/tactics/ws');
+ assert.equal(await evaluate("JSON.stringify(localStorage).includes('temporary-host-code')"),false);
+ await evaluate("localStorage.setItem('tactics-server','https://example.test/tactics/');");assert.equal(await evaluate('__TACTICS_TEST__.online.endpoint()'),'wss://example.test/tactics/ws');await evaluate("localStorage.removeItem('tactics-server');__TACTICS_TEST__.online.list=()=>{};document.querySelector('[data-action=online]').click()");
+ assert.ok(await evaluate("document.body.textContent.includes('星海会馆')"));assert.equal(await evaluate("document.body.textContent.includes('当前使用 TapTap 房间')"),false);await capture('02-shared-lobby');
+ assert.deepEqual(errors,[]);console.log('Tap H5 package: phone bounds, missing SDK, cancellation, empty code, stale/duplicate callbacks, native authorization and shared-server room selection passed (mock host; no real-device claim).');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{socket?.close();child?.kill();server.close();await pause(500);assert.ok(profile.startsWith(path.join(os.tmpdir(),'tactics-tap-host-')));try{fs.rmSync(profile,{recursive:true,force:true,maxRetries:5,retryDelay:200});}catch(error){if(!['EPERM','EBUSY'].includes(error.code))throw error;}});

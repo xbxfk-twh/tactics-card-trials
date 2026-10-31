@@ -51,6 +51,8 @@ scripts/        公开范围与暂存文件审计
 
 详细说明：[架构](docs/architecture.md) · [开发与测试](docs/development.md) · [部署](docs/deployment.md)。
 
+TapTap H5 的独立候选包、平台验收边界和商店文案见 [发布准备](docs/taptap/release.md)。广告按开发者选择暂缓，当前未接入。
+
 ## Android
 
 最低Android 8.0；构建需要JDK、Python、Pillow及官方Android SDK 35 / Build Tools 35.0.0。当前脚本使用Windows SDK工具，见 [Android README](apps/android/README.md)。签名和内置资源一致性有自动验证，尚未进行真机安装测试。

@@ -27,5 +27,6 @@ node tests/vfx-browser.cjs
 - SDK与签名材料放在用户工具缓存或显式指定目录，不进入Git。
 - 可选素材再生成依赖见 `requirements-build.txt`；生成MP3另需本机FFmpeg。
 - Kenney官方ZIP输入位于 `artifacts/source-assets/kenney-particles/official-particle-pack.zip`，来源与许可见根目录第三方说明。
+- TapTap H5 候选包使用 `npm run build:taptap`，模拟宿主回归使用 `npm run test:taptap`；与默认 Web/Android 包分开，见 [TapTap 发布准备](taptap/release.md)。
 
 公开树只维护当前Web和Android版本。旧平台原型不随仓库维护，Web中的平台适配器由模拟SDK测试覆盖。

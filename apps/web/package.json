@@ -7,6 +7,8 @@
     "start": "node tools/launch.cjs",
     "test": "node tools/check-assets.cjs && node tests/engine.test.cjs && node tests/rules-regression.test.cjs && node tests/summoning.test.cjs && node tests/progression.test.cjs && node tests/campaign-boss.test.cjs && node tests/campaign-content.test.cjs && node tests/party-balance.test.cjs && node tests/solo-campaign.test.cjs && node tests/solo-balance.test.cjs && node tests/presentation.test.cjs && node tests/card-presentation.test.cjs && node tests/unit-state.test.cjs && node tests/aura-status.test.cjs && node tests/skill-audio.test.cjs && node tests/media.test.cjs && node tests/practice.test.cjs && node tests/endpoint.test.cjs && node tests/online.test.cjs && node tests/summoning-online.test.cjs && node tests/lobby.test.cjs && node tests/tap-online.test.cjs",
     "build": "python tools/build_packages.py",
+    "build:taptap": "python tools/build_taptap.py",
+    "test:taptap": "node tests/tap-host-browser.cjs",
     "check": "node tools/check-assets.cjs",
     "probe": "node tools/probe-server.cjs"
   },
