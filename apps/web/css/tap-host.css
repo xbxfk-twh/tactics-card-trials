@@ -1,0 +1,12 @@
+/* Isolated storefront-host entry; not loaded by the regular web/Android builds. */
+.tap-entry{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 20% 15%,#d4e3c5,transparent 60%),linear-gradient(145deg,#f7f3e8,#e7eddf);}
+.tap-entry>section{width:min(460px,100%);padding:32px 26px;border:1px solid #d5ddca;border-radius:24px;background:#fffdf2ed;box-shadow:0 20px 80px #36534218;text-align:center;}
+.tap-entry .sub{letter-spacing:3px;font-size:11px;color:#7b886b;}
+.tap-entry h1{font-size:clamp(30px,8vw,42px);margin:20px 0 8px;color:#345843;letter-spacing:5px;}
+.tap-entry-lead{font-size:15px;color:#7b886c;line-height:1.7;margin:0 0 24px;}
+.tap-entry-modes{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:26px;}
+.tap-entry-modes span{font-size:11px;padding:6px 10px;border-radius:20px;background:#eaf0df;color:#5b7651;}
+.tap-entry .btn{width:100%;min-height:48px;font-size:16px;}
+.tap-entry-status{min-height:42px;font-size:12px;line-height:1.7;color:#6a795b;margin:14px 0;}
+.tap-entry small{display:block;font-size:11px;line-height:1.8;color:#8a907b;}
+@media(max-height:600px){.tap-entry{padding:12px;}.tap-entry>section{padding:20px;}.tap-entry h1{margin-top:12px;}.tap-entry-modes{margin-bottom:16px;}}

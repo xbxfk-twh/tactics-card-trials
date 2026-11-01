@@ -4,7 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const root=process.env.TACTICS_GAME_ROOT ? path.resolve(process.env.TACTICS_GAME_ROOT) : path.resolve(__dirname,'..');
 const capture=process.argv.includes('--capture'),mobile=process.argv.includes('--mobile');
-const captureDir=path.join(root,'..','..','artifacts','screenshots',mobile?'mobile':'desktop');
+const storeCapture=process.argv.includes('--store'),scale=storeCapture?2:1;
+const captureDir=path.join(root,'..','..','artifacts','screenshots',storeCapture?'store':mobile?'mobile':'desktop');
 const chrome=process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const profile=path.join(root,'.chrome-smoke-profile');
 const port=19257;
@@ -21,22 +22,22 @@ async function screenshot(name){if(!capture)return;await evaluate("Promise.all([
   fs.writeFileSync(path.join(captureDir,`${name}.png`),Buffer.from(result.result.data,'base64'));}
 async function campFits(action){
   for(const [width,height] of [[1280,720],[1024,768],[390,844],[360,640],[320,568]]){
-    await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<701});
+    await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:scale,mobile:width<701});
     const layout=await evaluate(`(()=>{const p=document.querySelector('.compact-camp'),cta=document.querySelector('[data-action=${action}]');return {width:innerWidth,height:innerHeight,docHeight:document.documentElement.scrollHeight,panelHeight:p.clientHeight,panelContent:p.scrollHeight,cta:cta.getBoundingClientRect().bottom,wide:document.documentElement.scrollWidth};})()`);
     assert.ok(layout.docHeight<=height+1&&layout.panelContent<=layout.panelHeight+1&&layout.cta<=height&&layout.wide<=width,JSON.stringify(layout));
   }
-  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:1,mobile});
+  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:scale,mobile});
 }
 async function boardFits(){
   for(const [width,height] of [[1280,720],[1024,768],[390,844],[360,640],[320,568]]){
-    await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<701});
+    await command('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:scale,mobile:width<701});
     await evaluate('scrollTo(0,0)');
     const geometry=await evaluate("(()=>{const board=document.querySelector('.board').getBoundingClientRect(),side=document.querySelector('.battle-side').getBoundingClientRect(),end=(document.querySelector('[data-action=end-turn]')||document.querySelector('.battle-side')).getBoundingClientRect();return {width:innerWidth,height:innerHeight,page:document.documentElement.scrollHeight,pageWidth:document.documentElement.scrollWidth,boardLeft:board.left,boardBottom:board.bottom,boardRight:board.right,boardTop:board.top,sideTop:side.top,sideLeft:side.left,end:end.bottom};})()");
     assert.ok(geometry.pageWidth<=width&&geometry.boardTop>=0,JSON.stringify(geometry));
     if(width<701)assert.ok(Math.abs(geometry.boardLeft)<1&&Math.abs(geometry.boardRight-width)<1&&geometry.boardBottom<=geometry.sideTop&&geometry.end<=geometry.page,JSON.stringify(geometry));
     else assert.ok(geometry.page<=height+1&&geometry.end<=height&&geometry.boardBottom<=height&&geometry.boardRight<=geometry.sideLeft,JSON.stringify(geometry));
   }
-  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:1,mobile});
+  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:scale,mobile});
 }
 (async()=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}/`;
@@ -44,7 +45,7 @@ async function boardFits(){
   socket=new WebSocket(await connect());socket.addEventListener('message',event=>{const msg=JSON.parse(event.data);
     if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id);pending.delete(msg.id);msg.error?p.reject(msg.error):p.resolve(msg);}});
   await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
-  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:1,mobile});
+  await command('Emulation.setDeviceMetricsOverride',{width:mobile?390:1280,height:mobile?844:720,deviceScaleFactor:scale,mobile});
   for(let i=0;i<40&&!await evaluate("!!document.querySelector('[data-action=campaign]')");i++)await pause(100);
   assert.ok(await evaluate("document.body.textContent.includes('从一棵古树开始')"));
   await evaluate("window.__leaveActiveMatch=()=>{if(['draft','deploy','battle'].includes(__TACTICS_TEST__.game.phase)){document.querySelector('[data-action=match-menu]').click();document.querySelector('[data-action=match-exit]').click();document.querySelector('[data-action=match-exit-confirm]').click();}}");

@@ -23,7 +23,7 @@
   const hubForm={mode:'casual',title:'',description:'',server:'',nickname:localStorage.getItem('tactics-nickname')||'',code:''};
   const practiceOptions={difficulty:'standard',format:'quick',preset:'balanced'};
   let lobbyTimer=null;
-  const tapOnline = !!window.TapOnlineClient?.supported();
+  const tapOnline = window.OnlineClient === window.TapOnlineClient;
 
   const h = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const art = id => `assets/characters/${h(DATA.cards[id]?.image || 'angel.webp')}`;
