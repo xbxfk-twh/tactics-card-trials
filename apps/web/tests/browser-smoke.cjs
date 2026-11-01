@@ -10,11 +10,16 @@ const chrome=process.env.CHROME_PATH||'C:\\Program Files\\Google\\Chrome\\Applic
 const profile=path.join(root,'.chrome-smoke-profile');
 const port=19257;
 process.env.TACTICS_DATA_FILE=path.join(profile,'players.json');
-const {server}=require(path.join(root,'server/server.cjs'));let child,base;
+const {server}=require(path.join(root,'server/server.cjs'));let child,base,browserStartError,browserStderr='';
 let socket,seq=0;const pending=new Map();
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-async function connect(){for(let i=0;i<50;i++){try{const pages=await(await fetch(`http://127.0.0.1:${port}/json`)).json();
-  const page=pages.find(p=>p.type==='page'&&p.url===base);if(page)return page.webSocketDebuggerUrl;}catch{}await pause(100);}throw Error('Chrome did not start');}
+async function connect(){const deadline=Date.now()+30000;while(Date.now()<deadline){
+  if(browserStartError)throw browserStartError;
+  if(child.exitCode!==null)throw Error(`Chrome exited before becoming ready (code ${child.exitCode}): ${browserStderr}`);
+  try{const pages=await(await fetch(`http://127.0.0.1:${port}/json`,{signal:AbortSignal.timeout(1000)})).json();
+    const page=pages.find(p=>p.type==='page'&&p.url===base);if(page)return page.webSocketDebuggerUrl;}catch{}
+  await pause(100);
+}throw Error('Chrome did not become ready within 30 seconds: '+browserStderr);}
 function command(method,params={}){return new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method,params}));});}
 async function evaluate(expression){const result=await command('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
   if(result.result.exceptionDetails)throw Error(JSON.stringify(result.result.exceptionDetails));return result.result.result.value;}
@@ -41,7 +46,8 @@ async function boardFits(){
 }
 (async()=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));base=`http://127.0.0.1:${server.address().port}/`;
-  child=spawn(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,`--remote-debugging-port=${port}`,base],{stdio:'ignore',windowsHide:true});
+  child=spawn(chrome,['--headless=new','--disable-gpu','--no-first-run','--no-default-browser-check',`--user-data-dir=${profile}`,`--remote-debugging-port=${port}`,base],{stdio:['ignore','ignore','pipe'],windowsHide:true});
+  child.once('error',error=>{browserStartError=error;});child.stderr.on('data',chunk=>{browserStderr=(browserStderr+chunk.toString()).slice(-3000);});
   socket=new WebSocket(await connect());socket.addEventListener('message',event=>{const msg=JSON.parse(event.data);
     if(msg.id&&pending.has(msg.id)){const p=pending.get(msg.id);pending.delete(msg.id);msg.error?p.reject(msg.error):p.resolve(msg);}});
   await new Promise(resolve=>socket.addEventListener('open',resolve,{once:true}));
